@@ -24,9 +24,7 @@ Ext.override(Rally.data.wsapi.TreeStore,{
                 m.addField({name: 'Passing', type: 'auto',  defaultValue: 0});
                 m.addField({name: 'Failing', type: 'auto', defaultValue: 0});
                 m.addField({name: 'NoRun', type: 'auto',  defaultValue: 0});
-                m.addField({name: 'Other', type: 'auto',  defaultValue: 0});
-                m.addField({name: 'TotalStories', type: 'auto',  defaultValue: 0});
-                m.addField({name: 'TotalCovered', type: 'auto',  defaultValue: 0});                
+                m.addField({name: 'Other', type: 'auto',  defaultValue: 0});      
         });
 
         _.each(Ext.Array.from(models), Rally.ui.grid.data.NodeInterface.decorate, Rally.ui.grid.data.NodeInterface);
@@ -132,33 +130,37 @@ Ext.override(Rally.ui.grid.TreeGrid, {
     },
 });
 
-Ext.override(Rally.data.wsapi.ParentChildMapper, {
+// Ext.override(Rally.data.wsapi.ParentChildMapper, {
 
-    constructor: function() {
-        this.parentChildTypeMap = {
-            hierarchicalrequirement: [
-                {typePath: 'defect', collectionName: 'Defects', parentField: 'Requirement'},
-                {typePath: 'testcase', collectionName: 'TestCases', parentField: 'WorkProduct'},
-                {typePath: 'hierarchicalrequirement', collectionName: 'Children', parentField: 'Parent'}
-            ],
-            defect: [
-                {typePath: 'testcase', collectionName: 'TestCases', parentField: 'WorkProduct'}
-            ],
-            defectsuite: [
-                {typePath: 'defect', collectionName: 'Defects', parentField: 'DefectSuites'},
-                {typePath: 'testcase', collectionName: 'TestCases', parentField: 'WorkProduct'}
-            ],
-            testset: [
-                {typePath: 'testcase', collectionName: 'TestCases', parentField: 'TestSets'}
-            ],
-            testcase: [
-                {typePath: 'defect', collectionName: 'Defects', parentField: 'TestCase'}
-            ],
-            attributedefinition: [
-                {typePath: 'allowedattributevalue', collectionName: 'AllowedValues', parentField: 'AttributeDefinition'}
-            ]
-        };
-    }
+//     constructor: function() {
+//         this.parentChildTypeMap = {
+//                 hierarchicalrequirement: [
+//                     {typePath: 'defect', collectionName: 'Defects', parentField: 'Requirement'},
+//                     {typePath: 'task', collectionName: 'Tasks', parentField: 'WorkProduct'},
+//                     {typePath: 'testcase', collectionName: 'TestCases', parentField: 'WorkProduct'},
+//                     {typePath: 'hierarchicalrequirement', collectionName: 'Children', parentField: 'Parent'}
+//                 ],
+//                 defect: [
+//                     {typePath: 'task', collectionName: 'Tasks', parentField: 'WorkProduct'},
+//                     {typePath: 'testcase', collectionName: 'TestCases', parentField: 'WorkProduct'}
+//                 ],
+//                 defectsuite: [
+//                     {typePath: 'defect', collectionName: 'Defects', parentField: 'DefectSuites'},
+//                     {typePath: 'task', collectionName: 'Tasks', parentField: 'WorkProduct'},
+//                     {typePath: 'testcase', collectionName: 'TestCases', parentField: 'WorkProduct'}
+//                 ],
+//                 testset: [
+//                     {typePath: 'task', collectionName: 'Tasks', parentField: 'WorkProduct'},
+//                     {typePath: 'testcase', collectionName: 'TestCases', parentField: 'TestSets'}
+//                 ],
+//                 testcase: [
+//                     {typePath: 'defect', collectionName: 'Defects', parentField: 'TestCase'}
+//                 ],
+//                 attributedefinition: [
+//                     {typePath: 'allowedattributevalue', collectionName: 'AllowedValues', parentField: 'AttributeDefinition'}
+//                 ]
+//         };
+//     }
 
 
-});
+// });
