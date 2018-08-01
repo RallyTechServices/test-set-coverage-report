@@ -22,7 +22,7 @@ Ext.define("CArABU.app.TSApp", {
         this.logger.setSaveForLater(this.getSetting('saveLog'));
 
         me._addSelector();
-        //setTimeout(function(){ me.updateView(); }, 500);
+        setTimeout(function(){ me.updateView(); }, 500);
         
     },
 
@@ -35,7 +35,7 @@ Ext.define("CArABU.app.TSApp", {
                 name: 'releaseCombo',
                 itemId: 'releaseCombo',
                 stateful: true,
-                stateId: 'releaseCombo-feature-test-case',   
+                stateId: 'releaseCombo-test-set',   
                 fieldLabel: 'Select Release:',
                 multiSelect: true,
                 margin: '10 10 10 10', 
@@ -73,30 +73,45 @@ Ext.define("CArABU.app.TSApp", {
         ]);
     },
 
+    _clearGrids: function(){
+        this.down('#display_box').removeAll();
+        this.down('#totals_f_box').removeAll();
+        this.down('#totals_box').removeAll();
+    },
+
     updateView: function(){
         var me = this;
 
 
         if(!me.down('#releaseCombo')) return;
-       // console.log('releases >',me.down('#releaseCombo').value);
-
         var cb = me.down('#releaseCombo');
-        //console.log(cb);
         if(cb.valueModels.length == 0){
             Rally.ui.notify.Notifier.showError({ message: "Please select one or more releases to display the report" });
             return;
         }
+
+        me._clearGrids();
         
+        var r_filters = [];
+        Ext.Array.each(me.down('#releaseCombo').value, function(rel){
+            r_filters.push({
+                property: 'Release.Name',
+                value: rel
+            })
+        });
+
+        r_filters = Rally.data.wsapi.Filter.or(r_filters)
+
         var ts_object_ids = [];
 
 
         me.setLoading(true);
-        me._getSelectedPIs(me.modelNames[0]).then({
+        me._getSelectedPIs(me.modelNames[0],r_filters).then({
             success: function(records){
-                // console.log('_getSelectedPIs>>',records);
                 if(records.length == 0){
                     me.showErrorNotification('No Data found!');
                 }
+
                 var promises = [];
 
 
@@ -106,41 +121,56 @@ Ext.define("CArABU.app.TSApp", {
                 });
 
 
-
                 Deft.Promise.all(promises).then({
                     success: function(records){
-                        console.log('collections',records);
+
                         records = Ext.Array.flatten(records);
-                        me.lastVerdict = {}
-                        me.lb_tc_results = [];
-                        Ext.Array.each(records,function(tc){
-                            me.lb_tc_results.push({
-                                                    'ObjectID': tc.TestCase.get('ObjectID'),
-                                                    'Name': tc.TestCase.get('Name'),
-                                                    'FormattedID': tc.TestCase.get('FormattedID'),
-                                                    'Method': tc.TestCase.get('Method'),
-                                                    '_ItemHierarchy': [tc.TestSet.get('ObjectID'),tc.TestCase.get('ObjectID')]});
-                            me.lastVerdict[tc.TestCase.get('ObjectID')] = tc.TestCase.get('LastVerdict');
+                        
+                        console.log('collections',records);
+
+                        me.test_sets = {};
+                        me.test_cases = {};
+
+                        Ext.Array.each(records, function(rec){
+                            me.test_sets[rec.TestSet] = {'TestCases': {}}
+                            Ext.Array.each(rec.TestCases, function(tc){
+
+                                me.test_sets[rec.TestSet]['TestCases'][tc.get('ObjectID')] = {
+                                    'ObjectID': tc.get('ObjectID'),
+                                    'FormattedID': tc.get('FormattedID'),
+                                    'Name': tc.get('Name'),
+                                    'Method': tc.get('Method'),
+                                    'Verdict' : null
+                                }
+                            });
                         });
 
-                        me.lb_tc_results_coverage = _.uniq(me.lb_tc_results, 'ObjectID');
-                        console.log('after construct',me.lastVerdict,  me.lb_tc_results);
+                        console.log(' me.test_sets', me.test_sets);
 
-                        Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
-                            models: me.modelNames,
-                            enableHierarchy: true
-                        }).then({
-                            success: me._addGrid,
+                        me._getTCRs(ts_object_ids).then({
+                            success: function(records){
+                                Ext.Array.each(records,function(tcr){
+                                    me.test_sets[tcr.get('TestSet').ObjectID].TestCases[tcr.get('TestCase').ObjectID].Verdict = tcr.get('Verdict');
+                                });
+
+                                Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
+                                    models: me.modelNames,
+                                    enableHierarchy: true
+                                }).then({
+                                    success: me._addGrid,
+                                    scope: me
+                                });
+
+                            },
                             scope: me
-                        });                        
+                        });
+                       
                     },
                     scope: me
                 });
 
             },
             scope: me         
-        }).always(function(){
-            me.setLoading(false);
         });
 
 
@@ -149,15 +179,18 @@ Ext.define("CArABU.app.TSApp", {
 
     _getTestCaseCollection: function(ts){
         var deferred = Ext.create('Deft.Deferred');
-
+            var results = {'TestSet': ts.get('ObjectID'), 'TestCases' : []};
             ts.getCollection('TestCases').load({
                 fetch: ['FormattedID', 'Name', 'LastVerdict','ObjectID','Method'],
                 limit: 2000,
                 pageSize: 2000,
                 callback: function(records, operation, success) {
-                    var results = [];
                     Ext.Array.each(records, function(tc) {
-                        results.push({"TestSet":ts,"TestCase":tc});
+                        if(results.TestSet){
+                            results.TestCases.push(tc);
+                        }else{
+                            results['TestCases'] = [tc];
+                        }
                     });
                     deferred.resolve(results);                    
                 }
@@ -178,16 +211,23 @@ Ext.define("CArABU.app.TSApp", {
         return me._loadWsapiRecords(config);
     },
 
-    _getTCs: function(filters){
+    _getTCRs: function(filters){
+        console.log('_getTCRs filters', filters);
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
 
         Ext.create('CArABU.technicalservices.chunk.Store',{
             storeConfig: {
-                model: 'TestCase',
-                fetch: ['ObjectID','LastVerdict','TestSet','TestSets'],
+                model: 'TestCaseResult',
+                fetch: ['ObjectID','Verdict','TestSet','TestCase','Name','FormattedID','Method','Build','LastBuild','Date','LastRun'],
+                sorters: [
+                    {
+                        property: 'Date',
+                        direction: 'ASC'
+                    }
+                ]                
             },
-            chunkProperty: 'TestSets.ObjectID',
+            chunkProperty: 'TestSet.ObjectID',
             chunkValue: filters
         }).load().then({
             success: function(records){
@@ -261,7 +301,7 @@ Ext.define("CArABU.app.TSApp", {
                     }     
                   },
                   listeners: {
-                    load: me._addTotals,
+                     load: me._addTotals,
                     viewChange: me.updateView,
                     scope: me
                   }
@@ -277,13 +317,11 @@ Ext.define("CArABU.app.TSApp", {
 
    _addTotals:function(grid) {
         var me = this;
-        // var filters = me.down('#pigridboard') && me.down('#pigridboard').gridConfig.store.filters.items[0];
         var filters = grid && grid.gridConfig.store.filters.items;
         var allPi;
         me.setLoading('Loading totals...');
             me._getSelectedPIs(me.modelNames[0],filters).then({
                 success: function(records){
-
 
                     var totalPass = {value:0,records:[]},
                         totalFail = {value:0,records:[]},
@@ -292,10 +330,10 @@ Ext.define("CArABU.app.TSApp", {
                         grandTotal = {value:0,records:[]},
                         totalAutomated = 0,
                         pctAutomated = 0,
-                        feature_totals = {};
+                        test_set_totals = {};
                     var record = {};
                     Ext.Array.each(records,function(r){
-                        feature_totals[r.get('FormattedID')] = {
+                        test_set_totals[r.get('FormattedID')] = {
                             grandTotal:0,
                             totalPass:0,
                             totalFail:0,
@@ -303,50 +341,45 @@ Ext.define("CArABU.app.TSApp", {
                             totalOther:0,
                             totalAutomated:0                                     
                         }
-                        Ext.Array.each(me.lb_tc_results_coverage,function(lbTc){
-                            if(Ext.Array.contains(lbTc._ItemHierarchy,r.get('ObjectID'))){
-                                record = {
-                                    'ObjectID': lbTc.ObjectID,
-                                    'FormattedID': lbTc.FormattedID,
-                                    'Name': lbTc.Name,
-                                    'Method': lbTc.Method
-                                }
-                                grandTotal.value++;
-                                grandTotal.records.push(record);                                
-                                if(feature_totals[r.get('FormattedID')]){
-                                    feature_totals[r.get('FormattedID')].grandTotal++
-                                }else{
-                                    feature_totals[r.get('FormattedID')] = {
-                                        grandTotal:1,
-                                        totalPass:0,
-                                        totalFail:0,
-                                        totalNoRun:0,
-                                        totalOther:0,
-                                        totalAutomated:0                                       
-                                    }
-                                }
-                                if(lbTc.Method == "Automated"){
-                                    totalAutomated++;
-                                    feature_totals[r.get('FormattedID')].totalAutomated++;
-                                }                    
-                                if(me.lastVerdict[lbTc.ObjectID] == "Pass"){
-                                    totalPass.value++;
-                                    totalPass.records.push(record);
-                                    feature_totals[r.get('FormattedID')].totalPass++;
-                                }else if(me.lastVerdict[lbTc.ObjectID] == "Fail"){
-                                    totalFail.value++;
-                                    totalFail.records.push(record);                                    
-                                    feature_totals[r.get('FormattedID')].totalFail++
-                                }else if(me.lastVerdict[lbTc.ObjectID] == null || me.lastVerdict[lbTc.ObjectID] == ""){
-                                    totalNoRun.value++;
-                                    totalNoRun.records.push(record);                                        
-                                    feature_totals[r.get('FormattedID')].totalNoRun++;
-                                }else{
-                                    totalOther.value++;
-                                    totalOther.records.push(record);                                       
-                                    feature_totals[r.get('FormattedID')].totalOther++;
+
+                        _.each(me.test_sets[r.get('ObjectID')].TestCases, function(tc,key){
+
+                            grandTotal.value++;
+                            grandTotal.records.push(record);                                
+                            if(test_set_totals[r.get('FormattedID')]){
+                                test_set_totals[r.get('FormattedID')].grandTotal++
+                            }else{
+                                test_set_totals[r.get('FormattedID')] = {
+                                    grandTotal:1,
+                                    totalPass:0,
+                                    totalFail:0,
+                                    totalNoRun:0,
+                                    totalOther:0,
+                                    totalAutomated:0                                       
                                 }
                             }
+                            if(tc.Method == "Automated"){
+                                totalAutomated++;
+                                test_set_totals[r.get('FormattedID')].totalAutomated++;
+                            }                    
+                            if(tc.Verdict == "Pass"){
+                                totalPass.value++;
+                                totalPass.records.push(tc);
+                                test_set_totals[r.get('FormattedID')].totalPass++;
+                            }else if(tc.Verdict == "Fail"){
+                                totalFail.value++;
+                                totalFail.records.push(tc);                                    
+                                test_set_totals[r.get('FormattedID')].totalFail++
+                            }else if(tc.Verdict == null || tc.Verdict == ""){
+                                totalNoRun.value++;
+                                totalNoRun.records.push(tc);                                        
+                                test_set_totals[r.get('FormattedID')].totalNoRun++;
+                            }else{
+                                totalOther.value++;
+                                totalOther.records.push(tc);                                       
+                                test_set_totals[r.get('FormattedID')].totalOther++;
+                            }
+
                         });
                     });
 
@@ -354,28 +387,26 @@ Ext.define("CArABU.app.TSApp", {
                         pctAutomated = Ext.Number.toFixed((totalAutomated / grandTotal.value) * 100,2);
                     }
 
-                    console.log('feature_totals>>',feature_totals);
+                    var testSetPassing = 0,
+                        testSetFailing = 0,
+                        testSetNoRun = 0,
+                        testSetNotCovered = 0;
+                    me.passingTestSetFilters = [];
 
-                    var featurePassing = 0,
-                        featureFailing = 0,
-                        featureNoRun = 0,
-                        featureNotCovered = 0;
-                    me.passingFeatureFilters = [];
-
-                    _.each(feature_totals, function(value, key){
+                    _.each(test_set_totals, function(value, key){
                         //console.log('Key, Value', key,value);
                         if(value.grandTotal === value.totalPass && value.grandTotal > 0) {
-                            featurePassing++;
-                            me.passingFeatureFilters.push({property:'FormattedID',operator: '!=',value:key});
+                            testSetPassing++;
+                            me.passingTestSetFilters.push({property:'FormattedID',operator: '!=',value:key});
                         }
-                        if(value.totalFail > 0) featureFailing++;
-                        //The Feature has  test cases, and at least one test has not run and zero test cases have failed.
-                        // When a feature has at least one count in the 'Other' category (inconclusive or blocked) and no failures it is considered Incomplete.
-                        if(value.grandTotal > 0 && value.totalFail === 0  && (value.totalNoRun > 0 || value.totalOther > 0)) featureNoRun++;
-                        if(value.totalFail === 0 && value.totalPass === 0 && value.totalNoRun === 0 && value.totalOther === 0) featureNotCovered++;
+                        if(value.totalFail > 0) testSetFailing++;
+                        //The testSet has  test cases, and at least one test has not run and zero test cases have failed.
+                        // When a testSet has at least one count in the 'Other' category (inconclusive or blocked) and no failures it is considered Incomplete.
+                        if(value.grandTotal > 0 && value.totalFail === 0  && (value.totalNoRun > 0 || value.totalOther > 0)) testSetNoRun++;
+                        if(value.totalFail === 0 && value.totalPass === 0 && value.totalNoRun === 0 && value.totalOther === 0) testSetNotCovered++;
                     });
 
-                    console.log('passingFeatureFilters>>',me.passingFeatureFilters);
+                    console.log('passingtestSetFilters>>',me.passingTestSetFilters);
 
                     me.down('#totals_f_box').removeAll();
                     me.down('#totals_box').removeAll();
@@ -452,10 +483,10 @@ Ext.define("CArABU.app.TSApp", {
 
 
                     Ext.create('Ext.data.Store', {
-                        storeId:'totalFeatureStore',
-                        fields:['GrandTotal', 'FeaturePassing','FeatureFailing','FeatureNoRun', 'FeatureNotCovered'],
+                        storeId:'totalTestSetStore',
+                        fields:['GrandTotal', 'TestSetPassing','TestSetFailing','TestSetNoRun', 'TestSetNotCovered'],
                         data:{'items':[
-                            { 'GrandTotal': records.length, 'FeaturePassing': featurePassing, 'FeatureFailing': featureFailing, 'FeatureNoRun': featureNoRun, 'FeatureNotCovered': featureNotCovered},
+                            { 'GrandTotal': records.length, 'TestSetPassing': testSetPassing, 'TestSetFailing': testSetFailing, 'TestSetNoRun': testSetNoRun, 'TestSetNotCovered': testSetNotCovered},
                         ]},
                         proxy: {
                             type: 'memory',
@@ -478,13 +509,13 @@ Ext.define("CArABU.app.TSApp", {
                         },
                         sortableColumns:false,
                         enableColumnHide:false,
-                        store: Ext.data.StoreManager.lookup('totalFeatureStore'),
+                        store: Ext.data.StoreManager.lookup('totalTestSetStore'),
                         columns: [
                             { text: 'Total Test Sets',  dataIndex: 'GrandTotal',flex:1},
-                            { text: 'Passing Test Sets', dataIndex: 'FeaturePassing',flex:1},
-                            { text: 'Failing Test Sets', dataIndex: 'FeatureFailing',flex:1},
-                            { text: 'Incomplete <br>Test Sets', dataIndex: 'FeatureNoRun',flex:1},
-                            { text: 'Not Covered <br>Test Sets', dataIndex: 'FeatureNotCovered',flex:1}
+                            { text: 'Passing Test Sets', dataIndex: 'TestSetPassing',flex:1},
+                            { text: 'Failing Test Sets', dataIndex: 'TestSetFailing',flex:1},
+                            { text: 'Incomplete <br>Test Sets', dataIndex: 'TestSetNoRun',flex:1},
+                            { text: 'Not Covered <br>Test Sets', dataIndex: 'TestSetNotCovered',flex:1}
                         ],
                         width:500
                     });
@@ -495,7 +526,7 @@ Ext.define("CArABU.app.TSApp", {
                         text: 'Hide Passing <br>Test Sets',
                         listeners: {
                             click: function(btn){
-                                me._hidePassingFeatures();
+                                me._hidePassingTestSets();
                             }
                         },
                         scope:me
@@ -509,11 +540,11 @@ Ext.define("CArABU.app.TSApp", {
  
     },
 
-    _hidePassingFeatures: function(){
+    _hidePassingTestSets: function(){
         var me = this;
-        var filter = Rally.data.wsapi.Filter.and(me.passingFeatureFilters);
+        var filter = Rally.data.wsapi.Filter.and(me.passingTestSetFilters);
                    
-        console.log(me.down('#pigridboard'),me.passingFeatureFilters);
+        console.log(me.down('#pigridboard'),me.passingTestSetFilters);
         var grid = me.down('#pigridboard')
         var filters = grid && grid.gridConfig.store.filters.items;
         filters.push(filter);
@@ -525,55 +556,60 @@ Ext.define("CArABU.app.TSApp", {
     },
 
     _updateAssociatedData: function(store, node, records, success){
+        console.log('_updateAssociatedData',records);
         var me = this;
         me.setLoading(true);
 
         me.suspendLayouts();
         var record = {};
+     
+
         Ext.Array.each(records,function(r){
-
-            var totalPass = {value:0,records:[]},
-                totalFail = {value:0,records:[]},
-                totalNoRun = {value:0,records:[]},
-                totalOther = {value:0,records:[]};
-
-
-            Ext.Array.each(me.lb_tc_results,function(lbTc){
-                record = {
-                    'ObjectID': lbTc.ObjectID,
-                    'FormattedID': lbTc.FormattedID,
-                    'Name': lbTc.Name,
-                    'Method': lbTc.Method
-                }
-                if(Ext.Array.contains(lbTc._ItemHierarchy,r.get('ObjectID'))){
-                    if(me.lastVerdict[lbTc.ObjectID] == "Pass"){
-                        totalPass.records.push(record);
-                        totalPass.value++;
-                    }else if(me.lastVerdict[lbTc.ObjectID] == "Fail"){
-                        totalFail.records.push(record);
-                        totalFail.value++;
-                    }else if(me.lastVerdict[lbTc.ObjectID] == null || me.lastVerdict[lbTc.ObjectID] == ""){
-                        totalNoRun.records.push(record);
-                        totalNoRun.value++;
-                    }else{
-                        totalOther.records.push(record);
-                        totalOther.value++;                        
-                    }
-                }
-            });
-
             if(r.get('_type') == 'testset'){
-                r.set('Passing', totalPass);
-                r.set('Failing', totalFail);
-                r.set('NoRun', totalNoRun);
-                r.set('Other', totalOther);                
-            }else if(r.get('_type') == 'testcase'){
-                r.set('Passing', totalPass.value > 0 ? { value: 'Yes',records:[]} :{ value: 'No',records:[]} );
-                r.set('Failing', totalFail.value > 0 ? { value: 'Yes',records:[]} :{ value: 'No',records:[]} );
-                r.set('NoRun', totalNoRun.value > 0 ? { value: 'Yes',records:[]} :{ value: 'No',records:[]} );
-                r.set('Other', totalOther.value > 0 ? { value: 'Yes',records:[]} :{ value: 'No',records:[]} );
-            }
 
+                var totalPass = {value:0,records:[]},
+                    totalFail = {value:0,records:[]},
+                    totalNoRun = {value:0,records:[]},
+                    totalOther = {value:0,records:[]};
+
+                    _.each(me.test_sets[r.get('ObjectID')].TestCases, function(tc,key){
+
+                        if(tc.Verdict == "Pass"){
+                            totalPass.records.push(tc);
+                            totalPass.value++;
+                        }else if(tc.Verdict == "Fail"){
+                            totalFail.records.push(tc);
+                            totalFail.value++;
+                        }else if(tc.Verdict == null || tc.Verdict == ""){
+                            totalNoRun.records.push(tc);
+                            totalNoRun.value++;
+                        }else{
+                            totalOther.records.push(tc);
+                            totalOther.value++;                        
+                        }
+
+                    });
+
+                    r.set('Passing', totalPass);
+                    r.set('Failing', totalFail);
+                    r.set('NoRun', totalNoRun);
+                    r.set('Other', totalOther);                
+
+
+            }else if(r.get('_type') == 'testcase'){
+
+                var tc = me.test_sets[r.parentNode.get('ObjectID')].TestCases && me.test_sets[r.parentNode.get('ObjectID')].TestCases[r.get('ObjectID')] || null;
+
+                if(tc.Verdict == "Pass"){
+                    r.set('Passing', { value: 'Yes',records:[]} );
+                }else if(tc.Verdict == "Fail"){
+                    r.set('Failing', { value: 'Yes',records:[]});
+                }else if(tc.Verdict == null || tc.Verdict == ""){
+                    r.set('NoRun', { value: 'Yes',records:[]} );
+                }else{
+                    r.set('Other', { value: 'Yes',records:[]} );                          
+                }
+            }
         });
         me.resumeLayouts();
         me.setLoading(false);
@@ -624,41 +660,14 @@ Ext.define("CArABU.app.TSApp", {
         plugins.push({
                     ptype: 'rallygridboardsharedviewcontrol',
                     stateful: true,
-                    stateId: me.getContext().getScopedStateId('feature-view'),
+                    stateId: me.getContext().getScopedStateId('test-set-view'),
                     stateEvents: ['select','beforedestroy'],
                     margin: 5
                 });
 
-        // plugins.push({
-        //     ptype: 'rallygridboardsharedviewcontrol',
-        //     sharedViewConfig: {
-        //         stateful: true,
-        //         stateId: me.getContext().getScopedStateId('feature-test-case-shared-view'),
-        //         defaultViews: _.map(this._getDefaultViews(), function(view) {
-        //             Ext.apply(view, {
-        //                 Value: Ext.JSON.encode(view.Value, true)
-        //             });
-        //             return view;
-        //         }, this),
-        //         enableUrlSharing: this.isFullPageApp !== false
-        //     }
-        // });
-
         return plugins;        
     },
 
-    // _getDefaultViews: function() {
-    //     return [
-    //         {
-    //             Name: 'Default View',
-    //             identifier: 1,
-    //             Value: {
-    //                 toggleState: 'grid',
-    //                 fields: this._getColumnCfgs()
-    //             }
-    //         }
-    //     ];
-    // },
 
     _getColumnCfgs: function(){
         var me = this;
@@ -792,6 +801,11 @@ Ext.define("CArABU.app.TSApp", {
             {
                 dataIndex : 'Method',
                 text: "Method",
+                flex: 1
+            },
+            {
+                dataIndex : 'Verdict',
+                text: "Verdict",
                 flex: 1
             }
         ];
