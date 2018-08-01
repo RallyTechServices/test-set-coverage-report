@@ -64,12 +64,19 @@ Ext.define('CArABU.technicalservices.chunk.Store',{
         var fetch = config.fetch || true,
             model = config.model || 'HierarchicalRequirement';
 
-        Ext.create(this.storeType,{
+        var chunk_config = {
             fetch: fetch,
             filters: filters,
             model: model,
-            context: {project: null}
-        }).load({
+            context: {project: null},
+            limit: Infinity
+        }
+
+        if (config.sorters){
+            chunk_config['sorters'] = config.sorters;
+        }
+
+        Ext.create(this.storeType,chunk_config).load({
             callback: function(records, operation, success){
                 if (success){
                     deferred.resolve(records);

@@ -1,3 +1,33 @@
+Ext.override(Rally.data.wsapi.ParentChildMapper, {
+
+    constructor: function() {
+        this.parentChildTypeMap = {
+            hierarchicalrequirement: [
+                {typePath: 'defect', collectionName: 'Defects', parentField: 'Requirement'},
+                {typePath: 'testcase', collectionName: 'TestCases', parentField: 'WorkProduct'},
+                {typePath: 'hierarchicalrequirement', collectionName: 'Children', parentField: 'Parent'}
+            ],
+            defect: [
+                {typePath: 'testcase', collectionName: 'TestCases', parentField: 'WorkProduct'}
+            ],
+            defectsuite: [
+                {typePath: 'defect', collectionName: 'Defects', parentField: 'DefectSuites'},
+                {typePath: 'testcase', collectionName: 'TestCases', parentField: 'WorkProduct'}
+            ],
+            testset: [
+                {typePath: 'testcase', collectionName: 'TestCases', parentField: 'TestSets'}
+            ],
+            testcase: [
+                {typePath: 'defect', collectionName: 'Defects', parentField: 'TestCase'}
+            ],
+            attributedefinition: [
+                {typePath: 'allowedattributevalue', collectionName: 'AllowedValues', parentField: 'AttributeDefinition'}
+            ]
+        };
+    }
+});
+
+
 /**
  * This override fixes a bug in the SharedViewComboBox which prevents a newly created
  * view from appearing in the view picker until after an app reload
@@ -129,38 +159,3 @@ Ext.override(Rally.ui.grid.TreeGrid, {
         return result;
     },
 });
-
-// Ext.override(Rally.data.wsapi.ParentChildMapper, {
-
-//     constructor: function() {
-//         this.parentChildTypeMap = {
-//                 hierarchicalrequirement: [
-//                     {typePath: 'defect', collectionName: 'Defects', parentField: 'Requirement'},
-//                     {typePath: 'task', collectionName: 'Tasks', parentField: 'WorkProduct'},
-//                     {typePath: 'testcase', collectionName: 'TestCases', parentField: 'WorkProduct'},
-//                     {typePath: 'hierarchicalrequirement', collectionName: 'Children', parentField: 'Parent'}
-//                 ],
-//                 defect: [
-//                     {typePath: 'task', collectionName: 'Tasks', parentField: 'WorkProduct'},
-//                     {typePath: 'testcase', collectionName: 'TestCases', parentField: 'WorkProduct'}
-//                 ],
-//                 defectsuite: [
-//                     {typePath: 'defect', collectionName: 'Defects', parentField: 'DefectSuites'},
-//                     {typePath: 'task', collectionName: 'Tasks', parentField: 'WorkProduct'},
-//                     {typePath: 'testcase', collectionName: 'TestCases', parentField: 'WorkProduct'}
-//                 ],
-//                 testset: [
-//                     {typePath: 'task', collectionName: 'Tasks', parentField: 'WorkProduct'},
-//                     {typePath: 'testcase', collectionName: 'TestCases', parentField: 'TestSets'}
-//                 ],
-//                 testcase: [
-//                     {typePath: 'defect', collectionName: 'Defects', parentField: 'TestCase'}
-//                 ],
-//                 attributedefinition: [
-//                     {typePath: 'allowedattributevalue', collectionName: 'AllowedValues', parentField: 'AttributeDefinition'}
-//                 ]
-//         };
-//     }
-
-
-// });
