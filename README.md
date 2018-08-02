@@ -1,8 +1,13 @@
 # Test Set Coverage Report
 
 ## Summary/Description
+This app lets you run Test Set coverage report. Select one or more Releases from dropdown and get all the TestSets and the coverage report based on the associated Test Case Results.
 
-![screenshot](./images/screenshot.png "This is an example")
+![screenshot](./images/screenshot1.png "This is an example")
+
+Click on the numbers that has links to open a popup and see the associated records.
+
+![screenshot](./images/screenshot2.png "This is an example")
 
 ## Development Notes
 
