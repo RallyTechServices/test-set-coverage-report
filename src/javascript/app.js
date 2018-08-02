@@ -565,12 +565,11 @@ Ext.define("CArABU.app.TSApp", {
      
 
         Ext.Array.each(records,function(r){
+            var totalPass = {value:0,records:[]},
+                totalFail = {value:0,records:[]},
+                totalNoRun = {value:0,records:[]},
+                totalOther = {value:0,records:[]};
             if(r.get('_type') == 'testset'){
-
-                var totalPass = {value:0,records:[]},
-                    totalFail = {value:0,records:[]},
-                    totalNoRun = {value:0,records:[]},
-                    totalOther = {value:0,records:[]};
 
                     _.each(me.test_sets[r.get('ObjectID')].TestCases, function(tc,key){
 
@@ -589,27 +588,36 @@ Ext.define("CArABU.app.TSApp", {
                         }
 
                     });
-
                     r.set('Passing', totalPass);
                     r.set('Failing', totalFail);
                     r.set('NoRun', totalNoRun);
-                    r.set('Other', totalOther);                
-
-
+                    r.set('Other', totalOther);   
             }else if(r.get('_type') == 'testcase'){
 
                 var tc = me.test_sets[r.parentNode.get('ObjectID')].TestCases && me.test_sets[r.parentNode.get('ObjectID')].TestCases[r.get('ObjectID')] || null;
-
-                if(tc.Verdict == "Pass"){
-                    r.set('Passing', { value: 'Yes',records:[]} );
-                }else if(tc.Verdict == "Fail"){
-                    r.set('Failing', { value: 'Yes',records:[]});
-                }else if(tc.Verdict == null || tc.Verdict == ""){
-                    r.set('NoRun', { value: 'Yes',records:[]} );
-                }else{
-                    r.set('Other', { value: 'Yes',records:[]} );                          
+                if(tc){
+                    if(tc.Verdict == "Pass"){
+                        totalPass.records.push(tc);
+                        totalPass.value++;
+                    }else if(tc.Verdict == "Fail"){
+                        totalFail.records.push(tc);
+                        totalFail.value++;
+                    }else if(tc.Verdict == null || tc.Verdict == ""){
+                        totalNoRun.records.push(tc);
+                        totalNoRun.value++;
+                    }else{
+                        totalOther.records.push(tc);
+                        totalOther.value++;                        
+                    }                    
                 }
+                r.set('Passing', totalPass);
+                r.set('Failing', totalFail);
+                r.set('NoRun', totalNoRun);
+                r.set('Other', totalOther);                   
             }
+
+  
+
         });
         me.resumeLayouts();
         me.setLoading(false);
