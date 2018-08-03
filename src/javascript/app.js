@@ -110,6 +110,7 @@ Ext.define("CArABU.app.TSApp", {
             success: function(records){
                 if(records.length == 0){
                     me.showErrorNotification('No Data found!');
+                    me.setLoading(false);
                 }
 
                 var promises = [];
@@ -167,13 +168,16 @@ Ext.define("CArABU.app.TSApp", {
                        
                     },
                     scope: me
-                });
+                })
 
+            },
+            failure: function(message){
+                me.showErrorNotification('Error. Check console logs');
+                console.log('Error:',message);
+                me.setLoading(false);
             },
             scope: me         
         });
-
-
     },
 
 
