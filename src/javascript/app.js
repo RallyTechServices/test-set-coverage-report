@@ -573,7 +573,9 @@ Ext.define("CArABU.app.TSApp", {
                 totalFail = {value:0,records:[]},
                 totalNoRun = {value:0,records:[]},
                 totalOther = {value:0,records:[]};
-            if(r.get('_type') == 'testset'){
+            if(r.get('_type') == 'task'){
+                r.parentNode.removeChild(r);
+            }else if(r.get('_type') == 'testset'){
 
                     _.each(me.test_sets[r.get('ObjectID')].TestCases, function(tc,key){
 
