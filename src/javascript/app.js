@@ -15,7 +15,11 @@ Ext.define("CArABU.app.TSApp", {
     integrationHeaders : {
         name : "CArABU.app.TSApp"
     },
-
+    config: {
+        defaultSettings: {
+            gridWidth: 1200
+        }
+    },
     modelNames : ['TestSet'],
     launch: function() {
         var me = this;
@@ -312,7 +316,7 @@ Ext.define("CArABU.app.TSApp", {
                   ,         
                   height: 500
                   ,
-                  width:1200
+                  width:me.getSetting('gridWidth')
               });
 
         me.setLoading(false);
@@ -848,7 +852,15 @@ Ext.define("CArABU.app.TSApp", {
 
     getSettingsFields: function() {
         var check_box_margins = '5 0 5 0';
-        return [{
+        return [        
+        {
+            xtype: 'rallynumberfield',
+            name: 'gridWidth',
+            margin: check_box_margins,
+            fieldLabel: 'Grid width (in pixels)',
+            fieldWidth: 100,
+            width: 200
+        },{
             name: 'saveLog',
             xtype: 'rallycheckboxfield',
             boxLabelAlign: 'after',
