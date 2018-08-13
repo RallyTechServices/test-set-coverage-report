@@ -3,13 +3,13 @@
 <head>
     <title>CATS-Test Set Coverage Report-0.1</title>
     <!--  (c) 2017 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Fri Aug 10 2018 10:42:15 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Aug 13 2018 13:41:31 GMT-0700 (PDT) -->
 
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Aug 10 2018 10:42:15 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Mon Aug 13 2018 13:41:31 GMT-0700 (PDT)";
         var ARTIFACT = "US2699";
         var BUILDER  = "rajan08";
-        var CHECKSUM = 47076306407;
+        var CHECKSUM = 47646294776;
     </script>
 
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -648,7 +648,11 @@ Ext.define("CArABU.app.TSApp", {
     integrationHeaders : {
         name : "CArABU.app.TSApp"
     },
-
+    config: {
+        defaultSettings: {
+            gridWidth: 1200
+        }
+    },
     modelNames : ['TestSet'],
     launch: function() {
         var me = this;
@@ -945,7 +949,7 @@ Ext.define("CArABU.app.TSApp", {
                   ,         
                   height: 500
                   ,
-                  width:1200
+                  width:me.getSetting('gridWidth')
               });
 
         me.setLoading(false);
@@ -1481,7 +1485,15 @@ Ext.define("CArABU.app.TSApp", {
 
     getSettingsFields: function() {
         var check_box_margins = '5 0 5 0';
-        return [{
+        return [        
+        {
+            xtype: 'rallynumberfield',
+            name: 'gridWidth',
+            margin: check_box_margins,
+            fieldLabel: 'Grid width (in pixels)',
+            fieldWidth: 100,
+            width: 200
+        },{
             name: 'saveLog',
             xtype: 'rallycheckboxfield',
             boxLabelAlign: 'after',
